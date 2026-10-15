@@ -1,0 +1,28 @@
+
+name: CapyBara CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build WinUI 3
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show .NET SDK
+        run: dotnet --info
+
+      - name: Restore dependencies
+        run: dotnet restore ./CapyBara.csproj
+
+      - name: Build CapyBara
+        run: dotnet build ./CapyBara.csproj --configuration Release --no-restore -p:Platform=x64
