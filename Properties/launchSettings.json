@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "CapyBara (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "CapyBara (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
