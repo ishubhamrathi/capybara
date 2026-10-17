@@ -20,29 +20,29 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Read and validate version
+      - name: Read version
         id: version
         shell: pwsh
         run: |
           $version = (Get-Content VERSION -Raw).Trim()
 
           if ($version -notmatch '^\d+\.\d+\.\d+$') {
-            throw "VERSION must use MAJOR.MINOR.PATCH, e.g. 0.2.0"
+            throw "VERSION must contain a valid version, e.g. 0.2.0"
           }
 
-          "version=v$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
 
-      - name: Check version has not been released
+      - name: Check version is new
         shell: pwsh
         env:
-          VERSION_TAG: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           git fetch --tags
-          if (git tag --list $env:VERSION_TAG) {
-            throw "Version $env:VERSION_TAG already exists."
+          if (git tag --list $env:TAG) {
+            throw "Version $env:TAG already exists."
           }
 
-      - name: Set up .NET
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
@@ -54,7 +54,6 @@ jobs:
         run: >
           dotnet publish ./CapyBara.csproj
           --configuration Release
-          --no-restore
           -r win-x64
           -p:Platform=x64
           -p:PublishReadyToRun=false
@@ -69,21 +68,20 @@ jobs:
       - name: Create version tag
         shell: pwsh
         env:
-          VERSION_TAG: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag $env:VERSION_TAG
-          git push origin $env:VERSION_TAG
+          git tag $env:TAG
+          git push origin $env:TAG
 
       - name: Publish GitHub Release
         shell: pwsh
         env:
-          VERSION_TAG: ${{ steps.version.outputs.version }}
-        run: |
-          gh release create $env:VERSION_TAG `
-            ./artifacts/CapyBara-win-x64.zip `
-            --title "CapyBara $env:VERSION_TAG" `
-            --generate-notes
-        env:
+          TAG: ${{ steps.version.outputs.tag }}
           GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:TAG `
+            ./artifacts/CapyBara-win-x64.zip `
+            --title "CapyBara $env:TAG" `
+            --generate-notes
