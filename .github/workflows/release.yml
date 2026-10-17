@@ -1,0 +1,89 @@
+name: CapyBara Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - VERSION
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read and validate version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "VERSION must use MAJOR.MINOR.PATCH, e.g. 0.2.0"
+          }
+
+          "version=v$version" >> $env:GITHUB_OUTPUT
+
+      - name: Check version has not been released
+        shell: pwsh
+        env:
+          VERSION_TAG: ${{ steps.version.outputs.version }}
+        run: |
+          git fetch --tags
+          if (git tag --list $env:VERSION_TAG) {
+            throw "Version $env:VERSION_TAG already exists."
+          }
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore ./CapyBara.csproj -r win-x64 -p:PublishReadyToRun=false
+
+      - name: Publish
+        run: >
+          dotnet publish ./CapyBara.csproj
+          --configuration Release
+          --no-restore
+          -r win-x64
+          -p:Platform=x64
+          -p:PublishReadyToRun=false
+          --self-contained true
+          -o ./artifacts/CapyBara
+
+      - name: Create ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path ./artifacts/CapyBara/* -DestinationPath ./artifacts/CapyBara-win-x64.zip
+
+      - name: Create version tag
+        shell: pwsh
+        env:
+          VERSION_TAG: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag $env:VERSION_TAG
+          git push origin $env:VERSION_TAG
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          VERSION_TAG: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create $env:VERSION_TAG `
+            ./artifacts/CapyBara-win-x64.zip `
+            --title "CapyBara $env:VERSION_TAG" `
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
