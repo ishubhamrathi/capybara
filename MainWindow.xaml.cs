@@ -651,9 +651,11 @@ public sealed partial class MainWindow : Window
 
         ActivateTab(tab);
 
-        tab.View.NavigationCompleted += (_, _) =>
+        tab.View.NavigationCompleted += (_, args) =>
         {
-            if (IsNewTabPageSource(tab.View.CoreWebView2?.Source))
+            LogChromeDiagnostic(
+                $"BROWSER_NAVIGATION_COMPLETED source={tab.View.Source} success={args.IsSuccess} webError={args.WebErrorStatus}");
+            if (NewTabPage.IsSource(tab.View.CoreWebView2?.Source))
                 tab.IsNewTabPage = true;
 
             if (tab.IsNewTabPage)
@@ -698,19 +700,17 @@ public sealed partial class MainWindow : Window
             await tab.View.EnsureCoreWebView2Async();
 
             CoreWebView2 core = tab.View.CoreWebView2;
+            NewTabPage.Configure(core);
 
             tab.View.NavigationStarting += (_, args) =>
             {
-                if (!string.Equals(args.Uri, "about:blank", StringComparison.OrdinalIgnoreCase))
-                    tab.IsNewTabPage = false;
+                tab.IsNewTabPage = NewTabPage.IsSource(args.Uri);
             };
 
             core.WebMessageReceived += async (_, args) =>
             {
-                // NavigateToString hosts the built-in page at about:blank. Use
-                // the message source as well as the tab flag because WebView2
-                // can raise NavigationStarting while replacing the document.
-                if (tab.IsNewTabPage || IsNewTabPageSource(args.Source))
+                // Keep page messaging scoped to the built-in virtual host.
+                if (tab.IsNewTabPage || NewTabPage.IsSource(args.Source))
                 {
                     Debug.WriteLine($"New Tab WebMessageReceived from {args.Source}: {args.WebMessageAsJson}");
                     await HandleNewTabMessageAsync(tab, core, args.WebMessageAsJson);
@@ -740,7 +740,7 @@ public sealed partial class MainWindow : Window
             else
             {
                 tab.IsNewTabPage = true;
-                core.NavigateToString(NewTabPage.Html);
+                core.Navigate(NewTabPage.Source);
             }
 
             if (focusAddressBar)
@@ -755,6 +755,7 @@ public sealed partial class MainWindow : Window
             tab.TitleText.Text = tab.Title;
             UpdateTabTooltip(tab);
 
+            LogChromeDiagnostic($"BROWSER_INITIALIZATION_FAILED source={tab.View.Source} error={ex}");
             Debug.WriteLine($"Browser initialization failed: {ex}");
         }
     }
@@ -819,7 +820,7 @@ public sealed partial class MainWindow : Window
                 cancellation.Dispose();
             }
 
-            if ((!tab.IsNewTabPage && !IsNewTabPageSource(core.Source)) || tab.View.CoreWebView2 != core)
+            if ((!tab.IsNewTabPage && !NewTabPage.IsSource(core.Source)) || tab.View.CoreWebView2 != core)
                 return;
 
             string responseJson = JsonSerializer.Serialize(new
@@ -839,9 +840,6 @@ public sealed partial class MainWindow : Window
             Debug.WriteLine($"Search suggestion request failed: {ex.Message}");
         }
     }
-
-    private static bool IsNewTabPageSource(string? source) =>
-        string.Equals(source, "about:blank", StringComparison.OrdinalIgnoreCase);
 
     private void CancelSuggestionRequest(BrowserTab tab)
     {
@@ -938,6 +936,9 @@ public sealed partial class MainWindow : Window
     {
         if (string.IsNullOrWhiteSpace(url))
             return "";
+
+        if (NewTabPage.IsSource(url))
+            return string.Empty;
 
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
             return url;

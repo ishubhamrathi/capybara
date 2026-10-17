@@ -1,28 +1,22 @@
-using System.Reflection;
+using Microsoft.Web.WebView2.Core;
 
 namespace CapyBara.Pages;
 
 public static class NewTabPage
 {
-    private static readonly Lazy<string> PageHtml = new(LoadHtml);
+    public const string HostName = "capybara.test";
+    public const string Source = "https://capybara.test/Pages/NewTabPage.html";
 
-    public static string Html => PageHtml.Value;
-
-    private static string LoadHtml()
+    public static void Configure(CoreWebView2 core)
     {
-        const string resourceName = "CapyBara.Pages.NewTabPage.html";
-        using Stream stream = typeof(NewTabPage).Assembly.GetManifestResourceStream(resourceName)
-            ?? throw new InvalidOperationException($"Embedded resource '{resourceName}' was not found.");
-        using var reader = new StreamReader(stream);
-        string html = reader.ReadToEnd();
-
-        const string logoResourceName = "CapyBara.Assets.CapyBaraNewTabLogo.png";
-        using Stream logoStream = typeof(NewTabPage).Assembly.GetManifestResourceStream(logoResourceName)
-            ?? throw new InvalidOperationException($"Embedded resource '{logoResourceName}' was not found.");
-        using var logoBuffer = new MemoryStream();
-        logoStream.CopyTo(logoBuffer);
-        string logoDataUri = $"data:image/png;base64,{Convert.ToBase64String(logoBuffer.ToArray())}";
-
-        return html.Replace("{{CAPYBARA_LOGO_DATA_URI}}", logoDataUri, StringComparison.Ordinal);
+        core.SetVirtualHostNameToFolderMapping(
+            HostName,
+            AppContext.BaseDirectory,
+            CoreWebView2HostResourceAccessKind.DenyCors);
     }
+
+    public static bool IsSource(string? source) =>
+        Uri.TryCreate(source, UriKind.Absolute, out Uri? uri) &&
+        string.Equals(uri.Host, HostName, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(uri.AbsolutePath, "/Pages/NewTabPage.html", StringComparison.OrdinalIgnoreCase);
 }

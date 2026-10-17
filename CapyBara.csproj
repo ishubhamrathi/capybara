@@ -37,8 +37,8 @@
 
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
-    <EmbeddedResource Include="Pages\NewTabPage.html" />
-    <EmbeddedResource Include="Assets\CapyBaraNewTabLogo.png" />
+    <Content Include="Pages\NewTabPage.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\CapyBaraNewTabLogo.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!--
