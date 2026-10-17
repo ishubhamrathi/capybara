@@ -1,3 +1,4 @@
+
 name: CapyBara Release
 
 on:
@@ -5,7 +6,9 @@ on:
     branches:
       - main
     paths:
-      - VERSION
+      - 'VERSION'
+  workflow_dispatch:
+
 
 permissions:
   contents: write
